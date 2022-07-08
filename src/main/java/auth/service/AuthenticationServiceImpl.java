@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
+import auth.configuration.PropertyReader;
 import auth.dto.UserDTO;
 import auth.model.User;
 import auth.repository.AuthenticationRepository;
@@ -60,9 +61,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 	@Override
 	public String getToken(User user) {
 		String token = "";
+		String secret = PropertyReader.getInstance().getProperty("secret");
+		if (secret == null)
+			throw new IllegalStateException("Secret word not found");
 		token = JWT.create().withIssuer(String.valueOf(user.getId()))
 				.withExpiresAt(new Date(System.currentTimeMillis() + (long) 3600 * 1000))
-				.sign(Algorithm.HMAC256(user.getPassword()));
+				.sign(Algorithm.HMAC256(secret));
 		return token;
 	}
 
