@@ -1,6 +1,9 @@
 package auth.service;
 
 import java.lang.reflect.Method;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.Optional;
 
 import javax.servlet.http.HttpServletRequest;
@@ -15,11 +18,12 @@ import org.springframework.web.servlet.ModelAndView;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.auth0.jwt.interfaces.DecodedJWT;
 
 import auth.annotations.PassToken;
 import auth.annotations.UserLoginToken;
+import auth.configuration.PropertyReader;
 import auth.model.User;
 
 @Component
@@ -31,12 +35,15 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object object) throws Exception {
 		String token = "";
+		String userId = "";
 		if (request.getHeader("Authorization") != null) {
 			String[] authorization = request.getHeader("Authorization").split(" ");
+			request.getHeader("userId");
 			String type = authorization[0];
 			System.err.println(type);
 			token = authorization[1];
 			System.err.println(token);
+			userId = request.getHeader("userId");
 		}
 		if (!(object instanceof HandlerMethod)) {
 			return true;
@@ -61,28 +68,44 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
 					throw new RuntimeException("nothing token，Please login again");
 				}
 				// Obtain token Medium user id
-				String userId;
-				try {
-					userId = JWT.decode(token).getAudience().get(0);
-				} catch (JWTDecodeException j) {
-					throw new RuntimeException("401");
-				}
-				Optional<User> user = authenticationService.findUserById(userId);
 
-				if (!user.isPresent()) {
-					throw new RuntimeException("User does not exist, please login again");
-				}
-				// Verification token
-				JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256(user.get().getPassword())).build();
+				String secret = PropertyReader.getInstance().getProperty("secret");
 				try {
-					jwtVerifier.verify(token);
-				} catch (JWTVerificationException e) {
-					throw new RuntimeException("401");
+					Algorithm algorithm = Algorithm.HMAC256(secret);
+					// Verifier to configure the decoding of encrypted token.
+					JWTVerifier verifier = JWT.require(algorithm).withIssuer(userId).build();
+					// Get decoded jwt token
+					DecodedJWT jwt = verifier.verify(token);
+
+					LocalDate now = convertToLocalDateViaInstant(new Date());
+					LocalDate tokenDate = convertToLocalDateViaInstant(jwt.getExpiresAt());
+					if (now.isAfter(tokenDate))
+						throw new RuntimeException("Token has expired ! ");
+
+				} catch (JWTVerificationException exception) {
+					System.err.println(exception.getMessage());
+
+					Optional<User> user = authenticationService.findUserById(userId);
+
+					if (!user.isPresent()) {
+						throw new RuntimeException("User does not exist, please login again");
+					}
+					// Verification token
+					JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256(user.get().getPassword())).build();
+					try {
+						jwtVerifier.verify(token);
+					} catch (JWTVerificationException e) {
+						throw new RuntimeException("401");
+					}
+					return true;
 				}
-				return true;
 			}
 		}
 		return true;
+	}
+
+	private LocalDate convertToLocalDateViaInstant(Date dateToConvert) {
+		return dateToConvert.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 	}
 
 	@Override

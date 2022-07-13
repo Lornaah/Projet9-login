@@ -64,6 +64,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 		String secret = PropertyReader.getInstance().getProperty("secret");
 		if (secret == null)
 			throw new IllegalStateException("Secret word not found");
+		// Create a new token with the user's id, which expires after 1 hour, using
+		// secret word (app.properties)
 		token = JWT.create().withIssuer(String.valueOf(user.getId()))
 				.withExpiresAt(new Date(System.currentTimeMillis() + (long) 3600 * 1000))
 				.sign(Algorithm.HMAC256(secret));

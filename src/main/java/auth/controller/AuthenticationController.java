@@ -53,8 +53,9 @@ public class AuthenticationController {
 
 	@UserLoginToken
 	@CrossOrigin
-	@GetMapping("/verify")
-	public void verifyToken() {
+	@GetMapping("/verifyToken")
+	public void verifyToken(String tokenToVerify) {
+
 	}
 
 }
