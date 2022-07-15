@@ -38,13 +38,10 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
 		String userId = "";
 		if (request.getHeader("Authorization") != null) {
 			String[] authorization = request.getHeader("Authorization").split(" ");
-			request.getHeader("userId");
-			String type = authorization[0];
-			System.err.println(type);
-			token = authorization[1];
-			System.err.println(token);
 			userId = request.getHeader("userId");
+			token = authorization[1];
 		}
+		// Verify we're working on a function with the Handler, not on a class
 		if (!(object instanceof HandlerMethod)) {
 			return true;
 		}
@@ -67,10 +64,10 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
 				if (token == null) {
 					throw new RuntimeException("nothing token，Please login again");
 				}
-				// Obtain token Medium user id
 
 				String secret = PropertyReader.getInstance().getProperty("secret");
 				try {
+					// Algorithm to encode / decode the token
 					Algorithm algorithm = Algorithm.HMAC256(secret);
 					// Verifier to configure the decoding of encrypted token.
 					JWTVerifier verifier = JWT.require(algorithm).withIssuer(userId).build();
@@ -83,22 +80,16 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
 						throw new RuntimeException("Token has expired ! ");
 
 				} catch (JWTVerificationException exception) {
-					System.err.println(exception.getMessage());
-
-					Optional<User> user = authenticationService.findUserById(userId);
-
-					if (!user.isPresent()) {
-						throw new RuntimeException("User does not exist, please login again");
-					}
-					// Verification token
-					JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256(user.get().getPassword())).build();
-					try {
-						jwtVerifier.verify(token);
-					} catch (JWTVerificationException e) {
-						throw new RuntimeException("401");
-					}
-					return true;
+					throw new RuntimeException(exception);
 				}
+				Optional<User> user = authenticationService.findUserById(userId);
+
+				if (!user.isPresent()) {
+					throw new RuntimeException("User does not exist, please login again");
+				}
+
+				return true;
+
 			}
 		}
 		return true;
